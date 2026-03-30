@@ -4,21 +4,21 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select'
+} from "@/components/ui/select";
 
 interface DifficultyOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 interface DifficultySelectProps {
-  label: string
-  value: string
-  summary: string
-  options: readonly DifficultyOption[]
-  onValueChange: (value: string) => void
-  onApply: () => void
-  applyDisabled: boolean
+  label: string;
+  value: string;
+  summary: string;
+  options: readonly DifficultyOption[];
+  onValueChange: (value: string) => void;
+  onApply: () => void;
+  applyDisabled: boolean;
 }
 
 export function DifficultySelect({
@@ -59,5 +59,5 @@ export function DifficultySelect({
       </div>
       <p className="difficulty-summary">{summary}</p>
     </div>
-  )
+  );
 }
