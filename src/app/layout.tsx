@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chromatic Collapse",
+  title: "Collapse Game",
   description:
-    "Chromatic Collapse is a Next.js 16 puzzle game with MongoDB Atlas-backed leaderboards for each difficulty.",
+    "Collapse Game is a puzzle game with leaderboards for each difficulty.",
 };
 
 export default function RootLayout({

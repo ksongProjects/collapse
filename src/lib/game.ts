@@ -29,6 +29,23 @@ export interface Group {
   size: number;
 }
 
+export interface AnimatedCell {
+  color: number;
+  row: number;
+  col: number;
+}
+
+export interface MovedCell {
+  color: number;
+  from: Position;
+  to: Position;
+}
+
+export interface BoardTransition {
+  removed: AnimatedCell[];
+  moved: MovedCell[];
+}
+
 export interface BoardMetrics {
   remainingCells: number;
   removableGroups: number;
@@ -49,21 +66,28 @@ export interface MoveResult {
   board: Board;
   metrics: BoardMetrics;
   group: Group;
+  transition: BoardTransition;
 }
 
 export type GameStatus = "playing" | "board-cleared" | "stuck";
 
 const COLOR_LIBRARY: readonly PaletteColor[] = [
-  { name: "Coral", hex: "#f26b5b" },
-  { name: "Honey", hex: "#f4b542" },
-  { name: "Moss", hex: "#7bbb69" },
-  { name: "Lagoon", hex: "#2ca6a4" },
-  { name: "Sky", hex: "#4b8bff" },
-  { name: "Indigo", hex: "#5b5fce" },
-  { name: "Plum", hex: "#9b4d96" },
-  { name: "Clay", hex: "#c26d52" },
-  { name: "Rose", hex: "#e11d48" },
+  { name: "Red", hex: "#ef4444" },
+  { name: "Orange", hex: "#f97316" },
+  { name: "Amber", hex: "#f59e0b" },
+  { name: "Yellow", hex: "#eab308" },
+  { name: "Lime", hex: "#84cc16" },
+  { name: "Green", hex: "#22c55e" },
+  { name: "Emerald", hex: "#10b981" },
+  { name: "Teal", hex: "#14b8a6" },
+  { name: "Cyan", hex: "#06b6d4" },
+  { name: "Sky", hex: "#0ea5e9" },
+  { name: "Blue", hex: "#3b82f6" },
+  { name: "Indigo", hex: "#6366f1" },
   { name: "Violet", hex: "#8b5cf6" },
+  { name: "Purple", hex: "#a855f7" },
+  { name: "Fuchsia", hex: "#d946ef" },
+  { name: "Rose", hex: "#ec4899" },
 ] as const;
 
 export function normalizeBoardSize(size: BoardSize): BoardSize {
@@ -105,7 +129,33 @@ export function createBoardData(size: BoardSize, colorCount: number): BoardData 
 }
 
 export function getPalette(colorCount: number): readonly PaletteColor[] {
-  return COLOR_LIBRARY.slice(0, normalizeColorCount(colorCount));
+  const targetCount = Math.min(normalizeColorCount(colorCount), COLOR_LIBRARY.length);
+  const candidates = [...COLOR_LIBRARY];
+  shuffle(candidates);
+
+  const selected: PaletteColor[] = [candidates.shift()!];
+
+  while (selected.length < targetCount && candidates.length > 0) {
+    let bestIndex = 0;
+    let bestDistance = -1;
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const nearestDistance = selected.reduce((smallest, current) => {
+        return Math.min(smallest, getHueDistance(candidate.hex, current.hex));
+      }, 180);
+
+      if (nearestDistance > bestDistance) {
+        bestDistance = nearestDistance;
+        bestIndex = index;
+      }
+    }
+
+    selected.push(candidates.splice(bestIndex, 1)[0]);
+  }
+
+  shuffle(selected);
+  return selected;
 }
 
 export function getGroupAt(board: Board, row: number, col: number): Group | null {
@@ -156,6 +206,7 @@ export function playGroup(board: Board, row: number, col: number): MoveResult | 
   }
 
   const nextBoard = cloneBoard(board);
+  const transition = buildBoardTransition(board, group);
 
   for (const cell of group.cells) {
     nextBoard[cell.row][cell.col] = null;
@@ -167,6 +218,7 @@ export function playGroup(board: Board, row: number, col: number): MoveResult | 
     board: nextBoard,
     metrics: analyzeBoard(nextBoard),
     group,
+    transition,
   };
 }
 
@@ -358,6 +410,66 @@ function chooseShapeSize(): number {
 }
 
 function collapseBoard(board: Board): void {
+  collapseGrid(board);
+}
+
+function buildBoardTransition(board: Board, group: Group): BoardTransition {
+  const size = getBoardSize(board);
+  const removedKeys = new Set(group.cells.map((cell) => toIndex(cell.row, cell.col, size.columns)));
+  const tokenBoard = board.map((row, rowIndex) =>
+    row.map((cell, colIndex) => {
+      if (cell === null || removedKeys.has(toIndex(rowIndex, colIndex, size.columns))) {
+        return null;
+      }
+
+      return {
+        id: toIndex(rowIndex, colIndex, size.columns),
+        color: cell,
+      };
+    }),
+  );
+  const removed = group.cells.map((cell) => ({
+    color: group.color,
+    row: cell.row,
+    col: cell.col,
+  }));
+
+  collapseGrid(tokenBoard);
+
+  const moved: MovedCell[] = [];
+
+  for (let row = 0; row < size.rows; row += 1) {
+    for (let col = 0; col < size.columns; col += 1) {
+      const token = tokenBoard[row][col];
+
+      if (token === null) {
+        continue;
+      }
+
+      const from = {
+        row: Math.floor(token.id / size.columns),
+        col: token.id % size.columns,
+      };
+
+      if (from.row === row && from.col === col) {
+        continue;
+      }
+
+      moved.push({
+        color: token.color,
+        from,
+        to: { row, col },
+      });
+    }
+  }
+
+  return {
+    removed,
+    moved,
+  };
+}
+
+function collapseGrid<T>(board: (T | null)[][]): void {
   const size = getBoardSize(board);
 
   for (let col = 0; col < size.columns; col += 1) {
@@ -518,7 +630,7 @@ function getNeighbors(row: number, col: number, size: BoardSize): Position[] {
   return neighbors;
 }
 
-function getBoardSize(board: Board): BoardSize {
+function getBoardSize(board: Array<Array<unknown>>): BoardSize {
   return {
     rows: board.length,
     columns: board[0]?.length ?? 0,
@@ -549,6 +661,49 @@ function shuffle<T>(items: T[]): void {
     const swapIndex = Math.floor(Math.random() * (index + 1));
     [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
   }
+}
+
+function getHueDistance(leftHex: string, rightHex: string): number {
+  const leftHue = getHue(leftHex);
+  const rightHue = getHue(rightHex);
+  const rawDistance = Math.abs(leftHue - rightHue);
+
+  return Math.min(rawDistance, 360 - rawDistance);
+}
+
+function getHue(hex: string): number {
+  const { red, green, blue } = hexToRgb(hex);
+  const redChannel = red / 255;
+  const greenChannel = green / 255;
+  const blueChannel = blue / 255;
+  const maxChannel = Math.max(redChannel, greenChannel, blueChannel);
+  const minChannel = Math.min(redChannel, greenChannel, blueChannel);
+  const delta = maxChannel - minChannel;
+
+  if (delta === 0) {
+    return 0;
+  }
+
+  let hue = 0;
+
+  if (maxChannel === redChannel) {
+    hue = ((greenChannel - blueChannel) / delta) % 6;
+  } else if (maxChannel === greenChannel) {
+    hue = (blueChannel - redChannel) / delta + 2;
+  } else {
+    hue = (redChannel - greenChannel) / delta + 4;
+  }
+
+  return (hue * 60 + 360) % 360;
+}
+
+function hexToRgb(hex: string): { red: number; green: number; blue: number } {
+  const normalized = hex.replace("#", "");
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return { red, green, blue };
 }
 
 function isInside(row: number, col: number, size: BoardSize): boolean {

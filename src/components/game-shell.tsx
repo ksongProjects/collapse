@@ -38,6 +38,31 @@ import {
 
 const DEFAULT_DIFFICULTY: DifficultyId = "very-easy";
 const DEFAULT_PRESET = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY];
+const REMOVAL_ANIMATION_MS = 100;
+const MOVEMENT_ANIMATION_MS = 200;
+
+interface BoardAnimation {
+  baseBoard: Board;
+  nextBoard: Board;
+  removed: Array<{
+    color: number;
+    row: number;
+    col: number;
+  }>;
+  moved: Array<{
+    color: number;
+    from: {
+      row: number;
+      col: number;
+    };
+    to: {
+      row: number;
+      col: number;
+    };
+  }>;
+  startedAt: number;
+  nextStatus: GameStatus;
+}
 
 function createEmptyBoard(size: BoardSize): Board {
   return Array.from({ length: size.rows }, () => Array<number | null>(size.columns).fill(null));
@@ -56,10 +81,29 @@ function getApiError(payload: unknown, fallbackMessage: string): string {
   return fallbackMessage;
 }
 
+function clamp01(value: number): number {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function easeInCubic(value: number): number {
+  return value * value * value;
+}
+
+function easeOutCubic(value: number): number {
+  return 1 - (1 - value) ** 3;
+}
+
+function toCellKey(row: number, col: number, columns: number): number {
+  return row * columns + col;
+}
+
 export function GameShell() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const timerHandleRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const animationRef = useRef<BoardAnimation | null>(null);
+  const drawBoardRef = useRef<(() => void) | null>(null);
   const runStartedAtRef = useRef(0);
   const nameInputId = useId();
 
@@ -88,6 +132,13 @@ export function GameShell() {
   useEffect(() => {
     const boardData = createBoardData(activePreset.size, activePreset.colorCount);
     const nextStatus = getStatus(boardData.metrics).status;
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    animationRef.current = null;
 
     setBoard(boardData.board);
     setPalette(boardData.palette);
@@ -119,6 +170,15 @@ export function GameShell() {
       }
     };
   }, [activePreset.colorCount, activePreset.size, boardSeed]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -233,25 +293,114 @@ export function GameShell() {
 
       for (let row = 0; row < activePreset.size.rows; row += 1) {
         for (let col = 0; col < activePreset.size.columns; col += 1) {
-          const x = col * cellSize;
-          const y = row * cellSize;
-          const cell = board[row]?.[col] ?? null;
-
           drawingContext.fillStyle = "#111827";
-          drawingContext.fillRect(x, y, cellSize, cellSize);
-
-          if (cell === null) {
-            continue;
-          }
-
-          const innerSize = Math.max(1, cellSize - 2);
-
-          drawingContext.fillStyle = palette[cell].hex;
-          drawingContext.fillRect(x + 1, y + 1, innerSize, innerSize);
+          drawingContext.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
         }
       }
+
+      function drawTile(
+        row: number,
+        col: number,
+        colorIndex: number,
+        options?: {
+          offsetX?: number;
+          offsetY?: number;
+          alpha?: number;
+          scale?: number;
+        },
+      ) {
+        const color = palette[colorIndex];
+
+        if (!color) {
+          return;
+        }
+
+        const offsetX = options?.offsetX ?? 0;
+        const offsetY = options?.offsetY ?? 0;
+        const alpha = options?.alpha ?? 1;
+        const scale = options?.scale ?? 1;
+        const inset = Math.min(1, Math.max(cellSize / 6, 1));
+        const tileSize = Math.max(1, cellSize - inset * 2);
+        const scaledSize = Math.max(1, tileSize * scale);
+        const x = col * cellSize + inset + offsetX + (tileSize - scaledSize) / 2;
+        const y = row * cellSize + inset + offsetY + (tileSize - scaledSize) / 2;
+
+        drawingContext.save();
+        drawingContext.globalAlpha = alpha;
+        drawingContext.fillStyle = color.hex;
+        drawingContext.fillRect(x, y, scaledSize, scaledSize);
+        drawingContext.restore();
+      }
+
+      function drawStaticBoard(currentBoard: Board, omittedKeys?: Set<number>) {
+        for (let row = 0; row < activePreset.size.rows; row += 1) {
+          for (let col = 0; col < activePreset.size.columns; col += 1) {
+            if (omittedKeys?.has(toCellKey(row, col, activePreset.size.columns))) {
+              continue;
+            }
+
+            const cell = currentBoard[row]?.[col] ?? null;
+
+            if (cell === null) {
+              continue;
+            }
+
+            drawTile(row, col, cell);
+          }
+        }
+      }
+
+      const animation = animationRef.current;
+
+      if (!animation) {
+        drawStaticBoard(board);
+        return;
+      }
+
+      const elapsed = performance.now() - animation.startedAt;
+
+      if (elapsed < REMOVAL_ANIMATION_MS) {
+        const removalProgress = clamp01(elapsed / REMOVAL_ANIMATION_MS);
+        const removedKeys = new Set(
+          animation.removed.map((cell) => toCellKey(cell.row, cell.col, activePreset.size.columns)),
+        );
+
+        drawStaticBoard(animation.baseBoard, removedKeys);
+
+        for (const cell of animation.removed) {
+          drawTile(cell.row, cell.col, cell.color, {
+            alpha: 1 - easeOutCubic(removalProgress),
+            scale: 1 - 0.28 * easeInCubic(removalProgress),
+          });
+        }
+
+        return;
+      }
+
+      const movementProgress = clamp01(
+        (elapsed - REMOVAL_ANIMATION_MS) / MOVEMENT_ANIMATION_MS,
+      );
+      const settledBoard = animation.nextBoard;
+      const movingDestinationKeys = new Set(
+        animation.moved.map((cell) => toCellKey(cell.to.row, cell.to.col, activePreset.size.columns)),
+      );
+
+      drawStaticBoard(settledBoard, movingDestinationKeys);
+
+      for (const cell of animation.moved) {
+        const easedProgress = easeOutCubic(movementProgress);
+        const travelX = (cell.to.col - cell.from.col) * cellSize * easedProgress;
+        const travelY = (cell.to.row - cell.from.row) * cellSize * easedProgress;
+
+        drawTile(cell.from.row, cell.from.col, cell.color, {
+          offsetX: travelX,
+          offsetY: travelY,
+        });
+      }
+
     }
 
+    drawBoardRef.current = drawBoard;
     drawBoard();
 
     const resizeObserver = new ResizeObserver(drawBoard);
@@ -277,6 +426,42 @@ export function GameShell() {
     return finalElapsed;
   }
 
+  function startBoardAnimation(nextAnimation: BoardAnimation) {
+    const totalDuration = REMOVAL_ANIMATION_MS + MOVEMENT_ANIMATION_MS;
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    animationRef.current = nextAnimation;
+    drawBoardRef.current?.();
+
+    const tick = () => {
+      const activeAnimation = animationRef.current;
+
+      if (!activeAnimation) {
+        animationFrameRef.current = null;
+        drawBoardRef.current?.();
+        return;
+      }
+
+      drawBoardRef.current?.();
+
+      if (performance.now() - activeAnimation.startedAt >= totalDuration) {
+        animationRef.current = null;
+        animationFrameRef.current = null;
+        drawBoardRef.current?.();
+        setStatus(activeAnimation.nextStatus);
+        return;
+      }
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+  }
+
   function handleApplyDifficulty() {
     if (selectedDifficulty === difficulty) {
       return;
@@ -290,7 +475,7 @@ export function GameShell() {
   }
 
   function handleBoardClick(event: MouseEvent<HTMLCanvasElement>) {
-    if (status !== "playing") {
+    if (status !== "playing" || animationRef.current !== null) {
       return;
     }
 
@@ -328,13 +513,21 @@ export function GameShell() {
     const nextStatus = getStatus(move.metrics).status;
 
     setBoard(move.board);
-    setStatus(nextStatus);
 
     if (nextStatus !== "playing") {
       stopTimerAndFreeze();
       setSubmitError(null);
       setSubmitSuccess(null);
     }
+
+    startBoardAnimation({
+      baseBoard: board,
+      nextBoard: move.board,
+      removed: move.transition.removed,
+      moved: move.transition.moved,
+      startedAt: performance.now(),
+      nextStatus,
+    });
   }
 
   async function handleSubmitWin(event: FormEvent<HTMLFormElement>) {
@@ -411,8 +604,8 @@ export function GameShell() {
     <div className="shell">
       <section className="panel hero-panel">
         <div className="hero-copy">
-          <p className="eyebrow">Next.js 16 Web Game</p>
-          <h1>Chromatic Collapse</h1>
+          <p className="eyebrow">Puzzle Game</p>
+          <h1>Collapse Game</h1>
           <p className="intro">
             Clear every connected color group, beat the timer, and submit winning runs to the leaderboard.
           </p>
