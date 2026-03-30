@@ -19,7 +19,7 @@ export const DIFFICULTY_ORDER: readonly DifficultyId[] = [
 export const DIFFICULTY_PRESETS: Record<DifficultyId, DifficultyPreset> = {
   "very-easy": {
     label: "Very Easy",
-    size: normalizeBoardSize({ columns: 10, rows: 10 }),
+    size: normalizeBoardSize({ columns: 15, rows: 15 }),
     colorCount: 4,
   },
   easy: {
@@ -40,7 +40,7 @@ export const DIFFICULTY_PRESETS: Record<DifficultyId, DifficultyPreset> = {
   "very-hard": {
     label: "Very Hard",
     size: normalizeBoardSize({ columns: 50, rows: 60 }),
-    colorCount: 10,
+    colorCount: 8,
   },
 };
 
