@@ -1,9 +1,9 @@
 export const MIN_COLUMNS = 10
-export const MAX_COLUMNS = 40
+export const MAX_COLUMNS = 50
 export const MIN_ROWS = 10
-export const MAX_ROWS = 50
+export const MAX_ROWS = 60
 export const MIN_COLORS = 3
-export const MAX_COLORS = 8
+export const MAX_COLORS = 10
 export const DEFAULT_COLORS = 5
 export const CELL_SIZE = 12
 
@@ -64,6 +64,8 @@ const COLOR_LIBRARY: readonly PaletteColor[] = [
   { name: 'Indigo', hex: '#5b5fce' },
   { name: 'Plum', hex: '#9b4d96' },
   { name: 'Clay', hex: '#c26d52' },
+  { name: 'Rose', hex: '#e11d48' },
+  { name: 'Violet', hex: '#8b5cf6' },
 ] as const
 
 export function normalizeBoardSize(size: BoardSize): BoardSize {

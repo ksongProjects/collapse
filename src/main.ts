@@ -1,7 +1,9 @@
 import './style.css'
+import { createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { DifficultySelect } from './components/difficulty-select'
 import {
   analyzeBoard,
-  CELL_SIZE,
   createBoardData,
   getStatus,
   normalizeBoardSize,
@@ -13,7 +15,7 @@ import {
   type PaletteColor,
 } from './game'
 
-type DifficultyId = 'very-easy' | 'easy' | 'medium' | 'hard'
+type DifficultyId = 'very-easy' | 'easy' | 'medium' | 'hard' | 'very-hard'
 
 interface RuntimeState {
   difficulty: DifficultyId
@@ -64,12 +66,18 @@ const DIFFICULTY_PRESETS: Record<
     size: normalizeBoardSize({ columns: 35, rows: 40 }),
     colorCount: 7,
   },
+  'very-hard': {
+    label: 'Very Hard',
+    size: normalizeBoardSize({ columns: 50, rows: 60 }),
+    colorCount: 10,
+  },
 }
 
 const defaultDifficulty: DifficultyId = 'very-easy'
 const defaultSize = DIFFICULTY_PRESETS[defaultDifficulty].size
 const defaultColorCount = DIFFICULTY_PRESETS[defaultDifficulty].colorCount
 const HISTORY_LIMIT = 10
+const DIFFICULTY_ORDER: readonly DifficultyId[] = ['very-easy', 'easy', 'medium', 'hard', 'very-hard']
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
@@ -128,49 +136,7 @@ app.innerHTML = `
           <h2>Choose difficulty</h2>
           <p class="note-text">Each difficulty locks its own board size and color count.</p>
 
-          <div class="difficulty-grid">
-            <label class="difficulty-option">
-              <input class="difficulty-input" type="radio" name="difficulty" value="very-easy" checked />
-              <span class="difficulty-content">
-                <span class="difficulty-copy">
-                  <span class="difficulty-name">Very Easy</span>
-                  <span class="difficulty-size">10 x 10 | 4 colors</span>
-                </span>
-              </span>
-            </label>
-
-            <label class="difficulty-option">
-              <input class="difficulty-input" type="radio" name="difficulty" value="easy" />
-              <span class="difficulty-content">
-                <span class="difficulty-copy">
-                  <span class="difficulty-name">Easy</span>
-                  <span class="difficulty-size">15 x 20 | 5 colors</span>
-                </span>
-              </span>
-            </label>
-
-            <label class="difficulty-option">
-              <input class="difficulty-input" type="radio" name="difficulty" value="medium" />
-              <span class="difficulty-content">
-                <span class="difficulty-copy">
-                  <span class="difficulty-name">Medium</span>
-                  <span class="difficulty-size">25 x 30 | 6 colors</span>
-                </span>
-              </span>
-            </label>
-
-            <label class="difficulty-option">
-              <input class="difficulty-input" type="radio" name="difficulty" value="hard" />
-              <span class="difficulty-content">
-                <span class="difficulty-copy">
-                  <span class="difficulty-name">Hard</span>
-                  <span class="difficulty-size">35 x 40 | 7 colors</span>
-                </span>
-              </span>
-            </label>
-          </div>
-
-          <button id="apply-setup" class="button" type="button">Apply Difficulty</button>
+          <div id="difficulty-select-root"></div>
         </section>
 
         <section class="panel history-panel">
@@ -184,10 +150,10 @@ app.innerHTML = `
 `
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game-board')!
+const boardScroll = document.querySelector<HTMLDivElement>('.board-scroll')!
 const boardTitle = document.querySelector<HTMLHeadingElement>('#board-title')!
 const boardTimer = document.querySelector<HTMLDivElement>('#board-timer')!
-const difficultyInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]'))
-const applySetupButton = document.querySelector<HTMLButtonElement>('#apply-setup')!
+const difficultySelectHost = document.querySelector<HTMLDivElement>('#difficulty-select-root')!
 const newBoardButton = document.querySelector<HTMLButtonElement>('#new-board')!
 const statusChip = document.querySelector<HTMLDivElement>('#status-chip')!
 const boardOverlay = document.querySelector<HTMLDivElement>('#board-overlay')!
@@ -197,6 +163,7 @@ const overlayText = document.querySelector<HTMLParagraphElement>('#overlay-text'
 const overlayNewBoardButton = document.querySelector<HTMLButtonElement>('#overlay-new-board')!
 const historyList = document.querySelector<HTMLDivElement>('#history-list')!
 const ctx = canvas.getContext('2d')!
+const difficultySelectRoot = createRoot(difficultySelectHost)
 
 const state: RuntimeState = {
   difficulty: defaultDifficulty,
@@ -213,24 +180,41 @@ const state: RuntimeState = {
 let runStartedAt = 0
 let timerHandle: number | null = null
 let nextHistoryId = 1
+let selectedDifficulty: DifficultyId = defaultDifficulty
+let renderCellSize = 12
 
 function createEmptyBoard(size: BoardSize): Board {
   return Array.from({ length: size.rows }, () => Array<number | null>(size.columns).fill(null))
 }
 
 function getBoardWidth(): number {
-  return state.size.columns * CELL_SIZE
+  return state.size.columns * renderCellSize
 }
 
 function getBoardHeight(): number {
-  return state.size.rows * CELL_SIZE
+  return state.size.rows * renderCellSize
 }
 
 function configureCanvas(): void {
+  const boardScrollStyles = window.getComputedStyle(boardScroll)
+  const horizontalPadding =
+    Number.parseFloat(boardScrollStyles.paddingLeft) + Number.parseFloat(boardScrollStyles.paddingRight)
+  const availableWidth = Math.max(
+    state.size.columns,
+    Math.floor(boardScroll.clientWidth - horizontalPadding),
+  )
+
+  renderCellSize = Math.max(1, Math.floor(availableWidth / state.size.columns))
+
+  const boardWidth = getBoardWidth()
+  const boardHeight = getBoardHeight()
   const dpr = window.devicePixelRatio || 1
-  canvas.width = getBoardWidth() * dpr
-  canvas.height = getBoardHeight() * dpr
+  canvas.width = boardWidth * dpr
+  canvas.height = boardHeight * dpr
+  canvas.style.width = `${boardWidth}px`
+  canvas.style.height = `${boardHeight}px`
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.imageSmoothingEnabled = false
 }
 
 function getDifficultySize(difficulty: DifficultyId): BoardSize {
@@ -245,24 +229,51 @@ function getDifficultyLabel(difficulty: DifficultyId): string {
   return DIFFICULTY_PRESETS[difficulty].label
 }
 
-function readSelectedDifficulty(): DifficultyId {
-  const selected = difficultyInputs.find((input) => input.checked)?.value
-
-  if (selected === 'very-easy' || selected === 'medium' || selected === 'hard') {
-    return selected
-  }
-
-  return 'easy'
+function getDifficultyDescription(difficulty: DifficultyId): string {
+  const preset = DIFFICULTY_PRESETS[difficulty]
+  return `${preset.size.columns} x ${preset.size.rows} | ${preset.colorCount} colors`
 }
 
-function syncSetupControls(): void {
-  applySetupButton.disabled = readSelectedDifficulty() === state.difficulty
+function isDifficultyId(value: string): value is DifficultyId {
+  return DIFFICULTY_ORDER.some((difficulty) => difficulty === value)
+}
+
+function readSelectedDifficulty(): DifficultyId {
+  return selectedDifficulty
+}
+
+function isSetupDirty(): boolean {
+  return readSelectedDifficulty() !== state.difficulty
 }
 
 function setDifficultySelection(difficulty: DifficultyId): void {
-  for (const input of difficultyInputs) {
-    input.checked = input.value === difficulty
+  selectedDifficulty = difficulty
+}
+
+function handleDifficultySelection(value: string): void {
+  if (!isDifficultyId(value)) {
+    return
   }
+
+  selectedDifficulty = value
+  render()
+}
+
+function renderDifficultyControl(): void {
+  difficultySelectRoot.render(
+    createElement(DifficultySelect, {
+      label: 'Difficulty',
+      value: selectedDifficulty,
+      summary: getDifficultyDescription(selectedDifficulty),
+      options: DIFFICULTY_ORDER.map((difficulty) => ({
+        value: difficulty,
+        label: getDifficultyLabel(difficulty),
+      })),
+      onValueChange: handleDifficultySelection,
+      onApply: applySetup,
+      applyDisabled: !isSetupDirty(),
+    }),
+  )
 }
 
 function loadBoard(): void {
@@ -356,12 +367,11 @@ function getCellFromEvent(event: MouseEvent): { row: number; col: number } | nul
 }
 
 function render(): void {
-  boardTitle.textContent =
-    `${getDifficultyLabel(state.difficulty)} | ${state.size.columns} x ${state.size.rows} | ${state.colorCount} colors`
+  boardTitle.textContent = `${getDifficultyLabel(state.difficulty)} | ${state.size.columns} x ${state.size.rows} | ${state.colorCount} colors`
   statusChip.textContent = getStatusLabel(state.status)
   statusChip.dataset.status = state.status
 
-  syncSetupControls()
+  renderDifficultyControl()
   renderTimer()
   renderHistory()
   renderOverlay()
@@ -393,8 +403,6 @@ function renderBoard(): void {
   const boardWidth = getBoardWidth()
   const boardHeight = getBoardHeight()
 
-  ctx.clearRect(0, 0, boardWidth, boardHeight)
-
   const backdrop = ctx.createLinearGradient(0, 0, boardWidth, boardHeight)
   backdrop.addColorStop(0, '#0f172a')
   backdrop.addColorStop(1, '#020617')
@@ -403,29 +411,22 @@ function renderBoard(): void {
 
   for (let row = 0; row < state.size.rows; row += 1) {
     for (let col = 0; col < state.size.columns; col += 1) {
-      const x = col * CELL_SIZE
-      const y = row * CELL_SIZE
+      const x = col * renderCellSize
+      const y = row * renderCellSize
       const cell = state.board[row][col]
 
-      ctx.fillStyle = 'rgba(148, 163, 184, 0.06)'
-      ctx.fillRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
+      ctx.fillStyle = '#111827'
+      ctx.fillRect(x, y, renderCellSize, renderCellSize)
 
       if (cell === null) {
         continue
       }
 
-      const inset = 0.35
-      const innerSize = CELL_SIZE - inset * 2
+      const inset = 1
+      const innerSize = Math.max(1, renderCellSize - inset * 2)
 
       ctx.fillStyle = state.palette[cell].hex
       ctx.fillRect(x + inset, y + inset, innerSize, innerSize)
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
-      ctx.fillRect(x + inset + 0.45, y + inset + 0.45, innerSize - 0.9, Math.max(1, innerSize * 0.18))
-
-      ctx.strokeStyle = 'rgba(2, 6, 23, 0.28)'
-      ctx.lineWidth = 0.3
-      ctx.strokeRect(x + inset, y + inset, innerSize, innerSize)
     }
   }
 }
@@ -505,11 +506,6 @@ function formatDuration(durationMs: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-for (const input of difficultyInputs) {
-  input.addEventListener('change', syncSetupControls)
-}
-
-applySetupButton.addEventListener('click', applySetup)
 newBoardButton.addEventListener('click', startNewBoard)
 overlayNewBoardButton.addEventListener('click', startNewBoard)
 canvas.addEventListener('click', handleBoardClick)
@@ -519,5 +515,4 @@ window.addEventListener('resize', () => {
 })
 
 configureCanvas()
-syncSetupControls()
 startNewBoard()
