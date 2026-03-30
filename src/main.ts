@@ -53,7 +53,7 @@ const DIFFICULTY_PRESETS: Record<
   },
   easy: {
     label: 'Easy',
-    size: normalizeBoardSize({ columns: 15, rows: 20 }),
+    size: normalizeBoardSize({ columns: 20, rows: 20 }),
     colorCount: 5,
   },
   medium: {
