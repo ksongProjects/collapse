@@ -131,7 +131,6 @@ h2 {
 
 .intro,
 .note-text,
-.message-line,
 .meter-text {
   color: var(--page-soft);
 }
@@ -306,34 +305,6 @@ h2 {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
-}
-
-.board-footer {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.message-line {
-  min-height: 3em;
-}
-
-.rule-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.rule-strip span {
-  border: 1px solid rgba(22, 50, 79, 0.12);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.62);
-}
-
-.rule-strip span {
-  padding: 0.45rem 0.8rem;
-  font-size: 0.9rem;
 }
 
 .sidebar {

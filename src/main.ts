@@ -158,7 +158,6 @@ const applySetupButton = document.querySelector<HTMLButtonElement>('#apply-setup
 const newBoardButton = document.querySelector<HTMLButtonElement>('#new-board')!
 const restartBoardButton = document.querySelector<HTMLButtonElement>('#restart-board')!
 const statusChip = document.querySelector<HTMLDivElement>('#status-chip')!
-const messageLine = document.querySelector<HTMLParagraphElement>('#message-line')!
 const boardOverlay = document.querySelector<HTMLDivElement>('#board-overlay')!
 const overlayKicker = document.querySelector<HTMLParagraphElement>('#overlay-kicker')!
 const overlayTitle = document.querySelector<HTMLHeadingElement>('#overlay-title')!
@@ -322,7 +321,6 @@ function getCellFromEvent(event: MouseEvent): { row: number; col: number } | nul
 
 function render(): void {
   boardTitle.textContent = `${state.size.columns} x ${state.size.rows} field with ${state.colorCount} colors`
-  messageLine.textContent = state.message
   statusChip.textContent = getStatusLabel(state.status)
   statusChip.dataset.status = state.status
 
