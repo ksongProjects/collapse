@@ -5,12 +5,8 @@ import {
   createBoardData,
   DEFAULT_COLORS,
   getStatus,
-  MAX_COLUMNS,
   MAX_COLORS,
-  MAX_ROWS,
   MIN_COLORS,
-  MIN_COLUMNS,
-  MIN_ROWS,
   normalizeBoardSize,
   normalizeColorCount,
   playGroup,
@@ -21,21 +17,54 @@ import {
   type PaletteColor,
 } from './game'
 
+type DifficultyId = 'easy' | 'medium' | 'hard'
+
 interface RuntimeState {
+  difficulty: DifficultyId
   size: BoardSize
   colorCount: number
   board: Board
   metrics: BoardMetrics
   palette: readonly PaletteColor[]
   status: GameStatus
-  message: string
+  elapsedMs: number
+  history: HistoryEntry[]
 }
 
-const defaultSize = normalizeBoardSize({
-  columns: 15,
-  rows: 20,
-})
+interface HistoryEntry {
+  id: number
+  difficulty: DifficultyId
+  outcome: 'Won' | 'Game Over'
+  durationMs: number
+  size: BoardSize
+  colorCount: number
+}
+
+const DIFFICULTY_PRESETS: Record<
+  DifficultyId,
+  {
+    label: string
+    size: BoardSize
+  }
+> = {
+  easy: {
+    label: 'Easy',
+    size: normalizeBoardSize({ columns: 15, rows: 20 }),
+  },
+  medium: {
+    label: 'Medium',
+    size: normalizeBoardSize({ columns: 25, rows: 30 }),
+  },
+  hard: {
+    label: 'Hard',
+    size: normalizeBoardSize({ columns: 35, rows: 40 }),
+  },
+}
+
+const defaultDifficulty: DifficultyId = 'easy'
+const defaultSize = DIFFICULTY_PRESETS[defaultDifficulty].size
 const defaultColorCount = normalizeColorCount(DEFAULT_COLORS)
+const HISTORY_LIMIT = 10
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
@@ -47,12 +76,14 @@ app.innerHTML = `
   <div class="shell">
     <section class="panel hero-panel">
       <div class="hero-copy">
-        <p class="eyebrow">TypeScript web game prototype</p>
-        <h2>Chromatic Collapse</h2>
+        <p class="eyebrow">TypeScript Web Game Prototype</p>
+        <h1>Chromatic Collapse</h1>
+        <p class="intro">
+          Pick a difficulty, set the number of colors, and clear every tile before the board locks up.
+        </p>
       </div>
       <div class="hero-actions">
-        <button id="new-board" class="button button-ghost" type="button">New Board</button>
-        <button id="restart-board" class="button" type="button">Restart Board</button>
+        <button id="new-board" class="button button-primary" type="button">New Game</button>
       </div>
     </section>
 
@@ -67,6 +98,7 @@ app.innerHTML = `
         </div>
 
         <div class="board-stage">
+          <div id="board-timer" class="board-timer">00:00</div>
           <div class="board-scroll">
             <canvas id="game-board" class="board-canvas" aria-label="Puzzle board"></canvas>
           </div>
@@ -76,8 +108,7 @@ app.innerHTML = `
               <h3 id="overlay-title" class="overlay-title">You Win</h3>
               <p id="overlay-text" class="overlay-text"></p>
               <div class="overlay-actions">
-                <button id="overlay-new-board" class="button button-ghost" type="button">New Board</button>
-                <button id="overlay-restart-board" class="button" type="button">Restart Board</button>
+                <button id="overlay-new-board" class="button button-primary" type="button">New Game</button>
               </div>
             </div>
           </div>
@@ -85,61 +116,66 @@ app.innerHTML = `
       </section>
 
       <aside class="sidebar">
-        <section class="panel size-panel">
+        <section class="panel setup-panel">
           <p class="eyebrow">Setup</p>
-          <h2>Choose your grid and colors</h2>
+          <h2>Difficulty and colors</h2>
+          <p class="note-text">Difficulty presets control board size. Color count changes how crowded the board feels.</p>
 
-          <div class="size-controls">
-            <label class="field" for="columns-input">
-              <span class="field-head">
-                <span>Columns</span>
-                <output id="columns-output" class="range-value">${defaultSize.columns}</output>
+          <div class="difficulty-grid">
+            <label class="difficulty-option">
+              <input class="difficulty-input" type="radio" name="difficulty" value="easy" checked />
+              <span class="difficulty-content">
+                <span class="difficulty-copy">
+                  <span class="difficulty-name">Easy</span>
+                  <span class="difficulty-size">15 x 20</span>
+                </span>
               </span>
-              <input
-                id="columns-input"
-                class="range-input"
-                type="range"
-                min="${MIN_COLUMNS}"
-                max="${MAX_COLUMNS}"
-                step="5"
-                value="${defaultSize.columns}"
-              />
             </label>
 
-            <label class="field" for="rows-input">
-              <span class="field-head">
-                <span>Rows</span>
-                <output id="rows-output" class="range-value">${defaultSize.rows}</output>
+            <label class="difficulty-option">
+              <input class="difficulty-input" type="radio" name="difficulty" value="medium" />
+              <span class="difficulty-content">
+                <span class="difficulty-copy">
+                  <span class="difficulty-name">Medium</span>
+                  <span class="difficulty-size">25 x 30</span>
+                </span>
               </span>
-              <input
-                id="rows-input"
-                class="range-input"
-                type="range"
-                min="${MIN_ROWS}"
-                max="${MAX_ROWS}"
-                step="5"
-                value="${defaultSize.rows}"
-              />
             </label>
 
-            <label class="field" for="colors-input">
-              <span class="field-head">
-                <span>Colors</span>
-                <output id="colors-output" class="range-value">${defaultColorCount}</output>
+            <label class="difficulty-option">
+              <input class="difficulty-input" type="radio" name="difficulty" value="hard" />
+              <span class="difficulty-content">
+                <span class="difficulty-copy">
+                  <span class="difficulty-name">Hard</span>
+                  <span class="difficulty-size">35 x 40</span>
+                </span>
               </span>
-              <input
-                id="colors-input"
-                class="range-input"
-                type="range"
-                min="${MIN_COLORS}"
-                max="${MAX_COLORS}"
-                step="1"
-                value="${defaultColorCount}"
-              />
             </label>
           </div>
 
+          <label class="field" for="colors-input">
+            <span class="field-head">
+              <span>Colors</span>
+              <output id="colors-output" class="range-value">${defaultColorCount}</output>
+            </span>
+            <input
+              id="colors-input"
+              class="range-input"
+              type="range"
+              min="${MIN_COLORS}"
+              max="${MAX_COLORS}"
+              step="1"
+              value="${defaultColorCount}"
+            />
+          </label>
+
           <button id="apply-setup" class="button" type="button">Apply Setup</button>
+        </section>
+
+        <section class="panel history-panel">
+          <p class="eyebrow">History</p>
+          <h2>Finished games</h2>
+          <div id="history-list" class="history-list"></div>
         </section>
       </aside>
     </div>
@@ -148,33 +184,36 @@ app.innerHTML = `
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game-board')!
 const boardTitle = document.querySelector<HTMLHeadingElement>('#board-title')!
-const columnsInput = document.querySelector<HTMLInputElement>('#columns-input')!
-const rowsInput = document.querySelector<HTMLInputElement>('#rows-input')!
+const boardTimer = document.querySelector<HTMLDivElement>('#board-timer')!
+const difficultyInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]'))
 const colorsInput = document.querySelector<HTMLInputElement>('#colors-input')!
-const columnsOutput = document.querySelector<HTMLOutputElement>('#columns-output')!
-const rowsOutput = document.querySelector<HTMLOutputElement>('#rows-output')!
 const colorsOutput = document.querySelector<HTMLOutputElement>('#colors-output')!
 const applySetupButton = document.querySelector<HTMLButtonElement>('#apply-setup')!
 const newBoardButton = document.querySelector<HTMLButtonElement>('#new-board')!
-const restartBoardButton = document.querySelector<HTMLButtonElement>('#restart-board')!
 const statusChip = document.querySelector<HTMLDivElement>('#status-chip')!
 const boardOverlay = document.querySelector<HTMLDivElement>('#board-overlay')!
 const overlayKicker = document.querySelector<HTMLParagraphElement>('#overlay-kicker')!
 const overlayTitle = document.querySelector<HTMLHeadingElement>('#overlay-title')!
 const overlayText = document.querySelector<HTMLParagraphElement>('#overlay-text')!
 const overlayNewBoardButton = document.querySelector<HTMLButtonElement>('#overlay-new-board')!
-const overlayRestartBoardButton = document.querySelector<HTMLButtonElement>('#overlay-restart-board')!
+const historyList = document.querySelector<HTMLDivElement>('#history-list')!
 const ctx = canvas.getContext('2d')!
 
 const state: RuntimeState = {
+  difficulty: defaultDifficulty,
   size: defaultSize,
   colorCount: defaultColorCount,
   board: createEmptyBoard(defaultSize),
   metrics: analyzeBoard(createEmptyBoard(defaultSize)),
   palette: [],
   status: 'playing',
-  message: '',
+  elapsedMs: 0,
+  history: [],
 }
+
+let runStartedAt = 0
+let timerHandle: number | null = null
+let nextHistoryId = 1
 
 function createEmptyBoard(size: BoardSize): Board {
   return Array.from({ length: size.rows }, () => Array<number | null>(size.columns).fill(null))
@@ -195,11 +234,22 @@ function configureCanvas(): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 }
 
-function readSelectedSize(): BoardSize {
-  return normalizeBoardSize({
-    columns: Number(columnsInput.value),
-    rows: Number(rowsInput.value),
-  })
+function getDifficultySize(difficulty: DifficultyId): BoardSize {
+  return DIFFICULTY_PRESETS[difficulty].size
+}
+
+function getDifficultyLabel(difficulty: DifficultyId): string {
+  return DIFFICULTY_PRESETS[difficulty].label
+}
+
+function readSelectedDifficulty(): DifficultyId {
+  const selected = difficultyInputs.find((input) => input.checked)?.value
+
+  if (selected === 'medium' || selected === 'hard') {
+    return selected
+  }
+
+  return 'easy'
 }
 
 function readSelectedColorCount(): number {
@@ -207,18 +257,24 @@ function readSelectedColorCount(): number {
 }
 
 function syncSetupControls(): void {
-  const selectedSize = readSelectedSize()
+  const selectedDifficulty = readSelectedDifficulty()
   const selectedColorCount = readSelectedColorCount()
-  columnsOutput.value = String(selectedSize.columns)
-  rowsOutput.value = String(selectedSize.rows)
+
   colorsOutput.value = String(selectedColorCount)
   applySetupButton.disabled =
-    selectedSize.columns === state.size.columns &&
-    selectedSize.rows === state.size.rows &&
-    selectedColorCount === state.colorCount
+    selectedDifficulty === state.difficulty && selectedColorCount === state.colorCount
 }
 
-function loadBoard(message: string): void {
+function setDifficultySelection(difficulty: DifficultyId): void {
+  for (const input of difficultyInputs) {
+    input.checked = input.value === difficulty
+  }
+}
+
+function loadBoard(): void {
+  stopTimer()
+  state.size = getDifficultySize(state.difficulty)
+
   const boardData = createBoardData(state.size, state.colorCount)
 
   state.size = boardData.size
@@ -227,43 +283,37 @@ function loadBoard(message: string): void {
   state.metrics = boardData.metrics
   state.palette = boardData.palette
   state.status = getStatus(state.metrics).status
-  state.message = message
+  state.elapsedMs = 0
 
-  columnsInput.value = String(state.size.columns)
-  rowsInput.value = String(state.size.rows)
+  setDifficultySelection(state.difficulty)
   colorsInput.value = String(state.colorCount)
   configureCanvas()
+  startTimer()
   render()
 }
 
-function startNewBoard(
-  message = 'Fresh board ready. Remove every tile to win.',
-): void {
-  loadBoard(message)
-}
-
-function restartBoard(): void {
-  loadBoard('Board restarted. Remove every tile to win.')
+function startNewBoard(): void {
+  loadBoard()
 }
 
 function applySetup(): void {
-  const selectedSize = readSelectedSize()
+  const selectedDifficulty = readSelectedDifficulty()
   const selectedColorCount = readSelectedColorCount()
 
-  if (
-    selectedSize.columns === state.size.columns &&
-    selectedSize.rows === state.size.rows &&
-    selectedColorCount === state.colorCount
-  ) {
+  if (selectedDifficulty === state.difficulty && selectedColorCount === state.colorCount) {
     return
   }
 
-  state.size = selectedSize
+  state.difficulty = selectedDifficulty
   state.colorCount = selectedColorCount
-  startNewBoard(`Board set to ${selectedSize.columns} x ${selectedSize.rows} with ${selectedColorCount} colors.`)
+  startNewBoard()
 }
 
 function handleBoardClick(event: MouseEvent): void {
+  if (state.status !== 'playing') {
+    return
+  }
+
   const cell = getCellFromEvent(event)
 
   if (!cell) {
@@ -273,23 +323,17 @@ function handleBoardClick(event: MouseEvent): void {
   const move = playGroup(state.board, cell.row, cell.col)
 
   if (!move) {
-    syncStatus('That square is stranded for now. Only connected groups of 2 or more can be cleared.')
-    render()
     return
   }
 
   state.board = move.board
   state.metrics = move.metrics
-
-  const statusInfo = getStatus(state.metrics)
-  state.status = statusInfo.status
+  state.status = getStatus(state.metrics).status
 
   if (state.status === 'board-cleared') {
-    state.message = 'Board cleared. You win.'
+    finishRun('Won')
   } else if (state.status === 'stuck') {
-    state.message = `Removed ${move.group.size} squares. No removable groups remain, so this board cannot be completed.`
-  } else {
-    state.message = `Removed ${move.group.size} squares. Keep clearing until the board is empty.`
+    finishRun('Game Over')
   }
 
   render()
@@ -320,11 +364,14 @@ function getCellFromEvent(event: MouseEvent): { row: number; col: number } | nul
 }
 
 function render(): void {
-  boardTitle.textContent = `${state.size.columns} x ${state.size.rows} field with ${state.colorCount} colors`
+  boardTitle.textContent =
+    `${getDifficultyLabel(state.difficulty)} | ${state.size.columns} x ${state.size.rows} | ${state.colorCount} colors`
   statusChip.textContent = getStatusLabel(state.status)
   statusChip.dataset.status = state.status
 
   syncSetupControls()
+  renderTimer()
+  renderHistory()
   renderOverlay()
   renderBoard()
 }
@@ -341,13 +388,14 @@ function renderOverlay(): void {
   if (state.status === 'board-cleared') {
     overlayKicker.textContent = 'Board Complete'
     overlayTitle.textContent = 'You Win'
-    overlayText.textContent = 'Every tile is gone. Start another board or replay this setup.'
+    overlayText.textContent = `Difficulty: ${getDifficultyLabel(state.difficulty)}. Final time: ${formatDuration(state.elapsedMs)}.`
     return
   }
 
   overlayKicker.textContent = 'No Moves Left'
   overlayTitle.textContent = 'Game Over'
-  overlayText.textContent = 'The remaining tiles cannot be removed because no connected group of 2 or more is left.'
+  overlayText.textContent =
+    `Difficulty: ${getDifficultyLabel(state.difficulty)}. Final time: ${formatDuration(state.elapsedMs)}. No connected group of 2 or more remains.`
 }
 
 function renderBoard(): void {
@@ -357,8 +405,8 @@ function renderBoard(): void {
   ctx.clearRect(0, 0, boardWidth, boardHeight)
 
   const backdrop = ctx.createLinearGradient(0, 0, boardWidth, boardHeight)
-  backdrop.addColorStop(0, '#0f2b46')
-  backdrop.addColorStop(1, '#061727')
+  backdrop.addColorStop(0, '#0f172a')
+  backdrop.addColorStop(1, '#020617')
   ctx.fillStyle = backdrop
   ctx.fillRect(0, 0, boardWidth, boardHeight)
 
@@ -368,7 +416,7 @@ function renderBoard(): void {
       const y = row * CELL_SIZE
       const cell = state.board[row][col]
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.028)'
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.06)'
       ctx.fillRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1)
 
       if (cell === null) {
@@ -381,19 +429,14 @@ function renderBoard(): void {
       ctx.fillStyle = state.palette[cell].hex
       ctx.fillRect(x + inset, y + inset, innerSize, innerSize)
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.14)'
-      ctx.fillRect(x + inset + 0.45, y + inset + 0.45, innerSize - 0.9, Math.max(1, innerSize * 0.22))
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+      ctx.fillRect(x + inset + 0.45, y + inset + 0.45, innerSize - 0.9, Math.max(1, innerSize * 0.18))
 
-      ctx.strokeStyle = 'rgba(2, 16, 29, 0.22)'
-      ctx.lineWidth = 0.35
+      ctx.strokeStyle = 'rgba(2, 6, 23, 0.28)'
+      ctx.lineWidth = 0.3
       ctx.strokeRect(x + inset, y + inset, innerSize, innerSize)
     }
   }
-}
-
-function syncStatus(message: string): void {
-  state.status = getStatus(state.metrics).status
-  state.message = message
 }
 
 function getStatusLabel(status: GameStatus): string {
@@ -407,14 +450,78 @@ function getStatusLabel(status: GameStatus): string {
   }
 }
 
-columnsInput.addEventListener('input', syncSetupControls)
-rowsInput.addEventListener('input', syncSetupControls)
+function startTimer(): void {
+  runStartedAt = performance.now()
+  state.elapsedMs = 0
+  renderTimer()
+  timerHandle = window.setInterval(() => {
+    state.elapsedMs = Math.floor(performance.now() - runStartedAt)
+    renderTimer()
+  }, 250)
+}
+
+function stopTimer(): void {
+  if (timerHandle !== null) {
+    window.clearInterval(timerHandle)
+    timerHandle = null
+  }
+}
+
+function finishRun(outcome: HistoryEntry['outcome']): void {
+  state.elapsedMs = Math.floor(performance.now() - runStartedAt)
+  stopTimer()
+  state.history.unshift({
+    id: nextHistoryId,
+    difficulty: state.difficulty,
+    outcome,
+    durationMs: state.elapsedMs,
+    size: { ...state.size },
+    colorCount: state.colorCount,
+  })
+  nextHistoryId += 1
+  state.history = state.history.slice(0, HISTORY_LIMIT)
+}
+
+function renderTimer(): void {
+  boardTimer.textContent = formatDuration(state.elapsedMs)
+}
+
+function renderHistory(): void {
+  if (state.history.length === 0) {
+    historyList.innerHTML = '<p class="history-empty">No finished games yet.</p>'
+    return
+  }
+
+  historyList.innerHTML = state.history
+    .map(
+      (entry) => `
+        <article class="history-item" data-outcome="${entry.outcome}">
+          <div class="history-copy">
+            <p class="history-outcome">${entry.outcome}</p>
+            <p class="history-meta">${getDifficultyLabel(entry.difficulty)} | ${entry.size.columns} x ${entry.size.rows} | ${entry.colorCount} colors</p>
+          </div>
+          <p class="history-time">${formatDuration(entry.durationMs)}</p>
+        </article>
+      `,
+    )
+    .join('')
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.floor(durationMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+for (const input of difficultyInputs) {
+  input.addEventListener('change', syncSetupControls)
+}
+
 colorsInput.addEventListener('input', syncSetupControls)
 applySetupButton.addEventListener('click', applySetup)
-newBoardButton.addEventListener('click', () => startNewBoard())
-restartBoardButton.addEventListener('click', restartBoard)
-overlayNewBoardButton.addEventListener('click', () => startNewBoard())
-overlayRestartBoardButton.addEventListener('click', restartBoard)
+newBoardButton.addEventListener('click', startNewBoard)
+overlayNewBoardButton.addEventListener('click', startNewBoard)
 canvas.addEventListener('click', handleBoardClick)
 window.addEventListener('resize', () => {
   configureCanvas()
