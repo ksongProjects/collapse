@@ -3,12 +3,8 @@ import {
   analyzeBoard,
   CELL_SIZE,
   createBoardData,
-  DEFAULT_COLORS,
   getStatus,
-  MAX_COLORS,
-  MIN_COLORS,
   normalizeBoardSize,
-  normalizeColorCount,
   playGroup,
   type Board,
   type BoardMetrics,
@@ -45,25 +41,29 @@ const DIFFICULTY_PRESETS: Record<
   {
     label: string
     size: BoardSize
+    colorCount: number
   }
 > = {
   easy: {
     label: 'Easy',
     size: normalizeBoardSize({ columns: 15, rows: 20 }),
+    colorCount: 5,
   },
   medium: {
     label: 'Medium',
     size: normalizeBoardSize({ columns: 25, rows: 30 }),
+    colorCount: 6,
   },
   hard: {
     label: 'Hard',
     size: normalizeBoardSize({ columns: 35, rows: 40 }),
+    colorCount: 7,
   },
 }
 
 const defaultDifficulty: DifficultyId = 'easy'
 const defaultSize = DIFFICULTY_PRESETS[defaultDifficulty].size
-const defaultColorCount = normalizeColorCount(DEFAULT_COLORS)
+const defaultColorCount = DIFFICULTY_PRESETS[defaultDifficulty].colorCount
 const HISTORY_LIMIT = 10
 
 const app = document.querySelector<HTMLDivElement>('#app')
@@ -79,7 +79,7 @@ app.innerHTML = `
         <p class="eyebrow">TypeScript Web Game Prototype</p>
         <h1>Chromatic Collapse</h1>
         <p class="intro">
-          Pick a difficulty, set the number of colors, and clear every tile before the board locks up.
+          Pick a difficulty and clear every tile before the board locks up.
         </p>
       </div>
       <div class="hero-actions">
@@ -118,8 +118,8 @@ app.innerHTML = `
       <aside class="sidebar">
         <section class="panel setup-panel">
           <p class="eyebrow">Setup</p>
-          <h2>Difficulty and colors</h2>
-          <p class="note-text">Difficulty presets control board size. Color count changes how crowded the board feels.</p>
+          <h2>Choose difficulty</h2>
+          <p class="note-text">Each difficulty locks its own board size and color count.</p>
 
           <div class="difficulty-grid">
             <label class="difficulty-option">
@@ -127,7 +127,7 @@ app.innerHTML = `
               <span class="difficulty-content">
                 <span class="difficulty-copy">
                   <span class="difficulty-name">Easy</span>
-                  <span class="difficulty-size">15 x 20</span>
+                  <span class="difficulty-size">15 x 20 | 5 colors</span>
                 </span>
               </span>
             </label>
@@ -137,7 +137,7 @@ app.innerHTML = `
               <span class="difficulty-content">
                 <span class="difficulty-copy">
                   <span class="difficulty-name">Medium</span>
-                  <span class="difficulty-size">25 x 30</span>
+                  <span class="difficulty-size">25 x 30 | 6 colors</span>
                 </span>
               </span>
             </label>
@@ -147,29 +147,13 @@ app.innerHTML = `
               <span class="difficulty-content">
                 <span class="difficulty-copy">
                   <span class="difficulty-name">Hard</span>
-                  <span class="difficulty-size">35 x 40</span>
+                  <span class="difficulty-size">35 x 40 | 7 colors</span>
                 </span>
               </span>
             </label>
           </div>
 
-          <label class="field" for="colors-input">
-            <span class="field-head">
-              <span>Colors</span>
-              <output id="colors-output" class="range-value">${defaultColorCount}</output>
-            </span>
-            <input
-              id="colors-input"
-              class="range-input"
-              type="range"
-              min="${MIN_COLORS}"
-              max="${MAX_COLORS}"
-              step="1"
-              value="${defaultColorCount}"
-            />
-          </label>
-
-          <button id="apply-setup" class="button" type="button">Apply Setup</button>
+          <button id="apply-setup" class="button" type="button">Apply Difficulty</button>
         </section>
 
         <section class="panel history-panel">
@@ -186,8 +170,6 @@ const canvas = document.querySelector<HTMLCanvasElement>('#game-board')!
 const boardTitle = document.querySelector<HTMLHeadingElement>('#board-title')!
 const boardTimer = document.querySelector<HTMLDivElement>('#board-timer')!
 const difficultyInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="difficulty"]'))
-const colorsInput = document.querySelector<HTMLInputElement>('#colors-input')!
-const colorsOutput = document.querySelector<HTMLOutputElement>('#colors-output')!
 const applySetupButton = document.querySelector<HTMLButtonElement>('#apply-setup')!
 const newBoardButton = document.querySelector<HTMLButtonElement>('#new-board')!
 const statusChip = document.querySelector<HTMLDivElement>('#status-chip')!
@@ -238,6 +220,10 @@ function getDifficultySize(difficulty: DifficultyId): BoardSize {
   return DIFFICULTY_PRESETS[difficulty].size
 }
 
+function getDifficultyColorCount(difficulty: DifficultyId): number {
+  return DIFFICULTY_PRESETS[difficulty].colorCount
+}
+
 function getDifficultyLabel(difficulty: DifficultyId): string {
   return DIFFICULTY_PRESETS[difficulty].label
 }
@@ -252,17 +238,8 @@ function readSelectedDifficulty(): DifficultyId {
   return 'easy'
 }
 
-function readSelectedColorCount(): number {
-  return normalizeColorCount(Number(colorsInput.value))
-}
-
 function syncSetupControls(): void {
-  const selectedDifficulty = readSelectedDifficulty()
-  const selectedColorCount = readSelectedColorCount()
-
-  colorsOutput.value = String(selectedColorCount)
-  applySetupButton.disabled =
-    selectedDifficulty === state.difficulty && selectedColorCount === state.colorCount
+  applySetupButton.disabled = readSelectedDifficulty() === state.difficulty
 }
 
 function setDifficultySelection(difficulty: DifficultyId): void {
@@ -274,6 +251,7 @@ function setDifficultySelection(difficulty: DifficultyId): void {
 function loadBoard(): void {
   stopTimer()
   state.size = getDifficultySize(state.difficulty)
+  state.colorCount = getDifficultyColorCount(state.difficulty)
 
   const boardData = createBoardData(state.size, state.colorCount)
 
@@ -286,7 +264,6 @@ function loadBoard(): void {
   state.elapsedMs = 0
 
   setDifficultySelection(state.difficulty)
-  colorsInput.value = String(state.colorCount)
   configureCanvas()
   startTimer()
   render()
@@ -298,14 +275,12 @@ function startNewBoard(): void {
 
 function applySetup(): void {
   const selectedDifficulty = readSelectedDifficulty()
-  const selectedColorCount = readSelectedColorCount()
 
-  if (selectedDifficulty === state.difficulty && selectedColorCount === state.colorCount) {
+  if (selectedDifficulty === state.difficulty) {
     return
   }
 
   state.difficulty = selectedDifficulty
-  state.colorCount = selectedColorCount
   startNewBoard()
 }
 
@@ -379,7 +354,6 @@ function render(): void {
 function renderOverlay(): void {
   const isVisible = state.status !== 'playing'
   boardOverlay.hidden = !isVisible
-  boardOverlay.dataset.status = state.status
 
   if (!isVisible) {
     return
@@ -518,7 +492,6 @@ for (const input of difficultyInputs) {
   input.addEventListener('change', syncSetupControls)
 }
 
-colorsInput.addEventListener('input', syncSetupControls)
 applySetupButton.addEventListener('click', applySetup)
 newBoardButton.addEventListener('click', startNewBoard)
 overlayNewBoardButton.addEventListener('click', startNewBoard)
