@@ -1,6 +1,6 @@
 export const MIN_COLUMNS = 10
 export const MAX_COLUMNS = 40
-export const MIN_ROWS = 20
+export const MIN_ROWS = 10
 export const MAX_ROWS = 50
 export const MIN_COLORS = 3
 export const MAX_COLORS = 8

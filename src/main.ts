@@ -13,7 +13,7 @@ import {
   type PaletteColor,
 } from './game'
 
-type DifficultyId = 'easy' | 'medium' | 'hard'
+type DifficultyId = 'very-easy' | 'easy' | 'medium' | 'hard'
 
 interface RuntimeState {
   difficulty: DifficultyId
@@ -44,6 +44,11 @@ const DIFFICULTY_PRESETS: Record<
     colorCount: number
   }
 > = {
+  'very-easy': {
+    label: 'Very Easy',
+    size: normalizeBoardSize({ columns: 10, rows: 10 }),
+    colorCount: 4,
+  },
   easy: {
     label: 'Easy',
     size: normalizeBoardSize({ columns: 15, rows: 20 }),
@@ -61,7 +66,7 @@ const DIFFICULTY_PRESETS: Record<
   },
 }
 
-const defaultDifficulty: DifficultyId = 'easy'
+const defaultDifficulty: DifficultyId = 'very-easy'
 const defaultSize = DIFFICULTY_PRESETS[defaultDifficulty].size
 const defaultColorCount = DIFFICULTY_PRESETS[defaultDifficulty].colorCount
 const HISTORY_LIMIT = 10
@@ -94,11 +99,13 @@ app.innerHTML = `
             <p class="eyebrow">Board</p>
             <h2 id="board-title">Loading board</h2>
           </div>
-          <div id="status-chip" class="status-chip">Loading</div>
+          <div class="status-cluster">
+            <div id="status-chip" class="status-chip">Loading</div>
+            <div id="board-timer" class="board-timer">00:00</div>
+          </div>
         </div>
 
         <div class="board-stage">
-          <div id="board-timer" class="board-timer">00:00</div>
           <div class="board-scroll">
             <canvas id="game-board" class="board-canvas" aria-label="Puzzle board"></canvas>
           </div>
@@ -123,7 +130,17 @@ app.innerHTML = `
 
           <div class="difficulty-grid">
             <label class="difficulty-option">
-              <input class="difficulty-input" type="radio" name="difficulty" value="easy" checked />
+              <input class="difficulty-input" type="radio" name="difficulty" value="very-easy" checked />
+              <span class="difficulty-content">
+                <span class="difficulty-copy">
+                  <span class="difficulty-name">Very Easy</span>
+                  <span class="difficulty-size">10 x 10 | 4 colors</span>
+                </span>
+              </span>
+            </label>
+
+            <label class="difficulty-option">
+              <input class="difficulty-input" type="radio" name="difficulty" value="easy" />
               <span class="difficulty-content">
                 <span class="difficulty-copy">
                   <span class="difficulty-name">Easy</span>
@@ -231,7 +248,7 @@ function getDifficultyLabel(difficulty: DifficultyId): string {
 function readSelectedDifficulty(): DifficultyId {
   const selected = difficultyInputs.find((input) => input.checked)?.value
 
-  if (selected === 'medium' || selected === 'hard') {
+  if (selected === 'very-easy' || selected === 'medium' || selected === 'hard') {
     return selected
   }
 
