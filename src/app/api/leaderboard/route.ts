@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         difficulty,
         clickCount: { $gte: 1 },
       })
-      .sort({ clickCount: 1, completionTimeMs: 1, createdAt: 1 })
+      .sort({ completionTimeMs: 1, clickCount: 1, createdAt: 1 })
       .limit(10)
       .toArray();
 

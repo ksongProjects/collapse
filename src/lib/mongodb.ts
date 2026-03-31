@@ -72,11 +72,11 @@ export async function getLeaderboardCollection(): Promise<Collection<Leaderboard
         {
           key: {
             difficulty: 1,
-            clickCount: 1,
             completionTimeMs: 1,
+            clickCount: 1,
             createdAt: 1,
           },
-          name: "difficulty_clicks_time_createdAt",
+          name: "difficulty_time_clicks_createdAt",
         },
       ])
       .then(() => undefined);

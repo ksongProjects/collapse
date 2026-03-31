@@ -740,7 +740,7 @@ export function GameShell() {
           <section className="panel leaderboard-panel">
             <p className="eyebrow">Leaderboard</p>
             <h2>Top 10 {getDifficultyLabel(difficulty)} wins</h2>
-            <p className="note-text">Fewer clicks rank higher. Faster time breaks ties.</p>
+            <p className="note-text">Faster time ranks higher. Fewer clicks break ties.</p>
 
             {leaderboardLoading ? <p className="leaderboard-empty">Loading leaderboard...</p> : null}
             {!leaderboardLoading && leaderboardError ? (
