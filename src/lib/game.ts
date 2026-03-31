@@ -2,8 +2,8 @@ export const MIN_COLUMNS = 10;
 export const MAX_COLUMNS = 50;
 export const MIN_ROWS = 10;
 export const MAX_ROWS = 60;
-export const MIN_COLORS = 3;
-export const MAX_COLORS = 10;
+export const MIN_COLORS = 4;
+export const MAX_COLORS = 7;
 
 export interface BoardSize {
   columns: number;
@@ -72,18 +72,18 @@ export interface MoveResult {
 export type GameStatus = "playing" | "board-cleared" | "stuck";
 
 const COLOR_LIBRARY: readonly PaletteColor[] = [
-  { name: "Coral", hex: "#d78888" },
-  { name: "Peach", hex: "#d79b74" },
-  { name: "Gold", hex: "#c9ae68" },
-  { name: "Olive", hex: "#a7b868" },
-  { name: "Sage", hex: "#8fad70" },
-  { name: "Mint", hex: "#74b38d" },
-  { name: "Teal", hex: "#65b1a1" },
-  { name: "Aqua", hex: "#6eafbf" },
-  { name: "Sky", hex: "#779fd0" },
-  { name: "Periwinkle", hex: "#8d97d7" },
-  { name: "Lavender", hex: "#ab92d5" },
-  { name: "Mauve", hex: "#c287be" },
+  { name: "Rosewood", hex: "#C05E5E" },
+  { name: "Steel Blue", hex: "#4A7C96" },
+  { name: "Amber Gold", hex: "#E5B769" },
+  { name: "Deep Forest", hex: "#4E6B52" },
+  { name: "Burnt Orange", hex: "#D99058" },
+  { name: "Royal Plum", hex: "#6D4C7D" },
+  { name: "Soft Mint", hex: "#A8DADC" },
+  { name: "Midnight Navy", hex: "#2C3E50" },
+  { name: "Eggshell", hex: "#F1E9DB" },
+  { name: "Terra Cotta", hex: "#AD6644" },
+  { name: "Lavender Grey", hex: "#948B99" },
+  { name: "Muted Lemon", hex: "#D4D977" },
 ] as const;
 
 export function normalizeBoardSize(size: BoardSize): BoardSize {
