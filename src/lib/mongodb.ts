@@ -5,7 +5,7 @@ import { type DifficultyId } from "@/lib/difficulty";
 export interface LeaderboardDocument {
   playerName: string;
   difficulty: DifficultyId;
-  score: number;
+  clickCount: number;
   completionTimeMs: number;
   createdAt: Date;
 }
@@ -72,11 +72,11 @@ export async function getLeaderboardCollection(): Promise<Collection<Leaderboard
         {
           key: {
             difficulty: 1,
-            score: -1,
+            clickCount: 1,
             completionTimeMs: 1,
             createdAt: 1,
           },
-          name: "difficulty_score_time_createdAt",
+          name: "difficulty_clicks_time_createdAt",
         },
       ])
       .then(() => undefined);
@@ -92,7 +92,10 @@ export function mapLeaderboardDocument(document: WithId<LeaderboardDocument>) {
     id: document._id.toString(),
     playerName: document.playerName,
     difficulty: document.difficulty,
-    score: document.score,
+    clickCount:
+      typeof document.clickCount === "number" && Number.isFinite(document.clickCount)
+        ? document.clickCount
+        : Number.MAX_SAFE_INTEGER,
     completionTimeMs: document.completionTimeMs,
     createdAt: document.createdAt.toISOString(),
   };

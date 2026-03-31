@@ -72,28 +72,24 @@ export interface MoveResult {
 export type GameStatus = "playing" | "board-cleared" | "stuck";
 
 const COLOR_LIBRARY: readonly PaletteColor[] = [
-  { name: "Red", hex: "#ef4444" },
-  { name: "Orange", hex: "#f97316" },
-  { name: "Amber", hex: "#f59e0b" },
-  { name: "Yellow", hex: "#eab308" },
-  { name: "Lime", hex: "#84cc16" },
-  { name: "Green", hex: "#22c55e" },
-  { name: "Emerald", hex: "#10b981" },
-  { name: "Teal", hex: "#14b8a6" },
-  { name: "Cyan", hex: "#06b6d4" },
-  { name: "Sky", hex: "#0ea5e9" },
-  { name: "Blue", hex: "#3b82f6" },
-  { name: "Indigo", hex: "#6366f1" },
-  { name: "Violet", hex: "#8b5cf6" },
-  { name: "Purple", hex: "#a855f7" },
-  { name: "Fuchsia", hex: "#d946ef" },
-  { name: "Rose", hex: "#ec4899" },
+  { name: "Coral", hex: "#d78888" },
+  { name: "Peach", hex: "#d79b74" },
+  { name: "Gold", hex: "#c9ae68" },
+  { name: "Olive", hex: "#a7b868" },
+  { name: "Sage", hex: "#8fad70" },
+  { name: "Mint", hex: "#74b38d" },
+  { name: "Teal", hex: "#65b1a1" },
+  { name: "Aqua", hex: "#6eafbf" },
+  { name: "Sky", hex: "#779fd0" },
+  { name: "Periwinkle", hex: "#8d97d7" },
+  { name: "Lavender", hex: "#ab92d5" },
+  { name: "Mauve", hex: "#c287be" },
 ] as const;
 
 export function normalizeBoardSize(size: BoardSize): BoardSize {
   return {
-    columns: snapToStep(size.columns, MIN_COLUMNS, MAX_COLUMNS, 5),
-    rows: snapToStep(size.rows, MIN_ROWS, MAX_ROWS, 5),
+    columns: clamp(Math.round(size.columns), MIN_COLUMNS, MAX_COLUMNS),
+    rows: clamp(Math.round(size.rows), MIN_ROWS, MAX_ROWS),
   };
 }
 
@@ -716,10 +712,4 @@ function toIndex(row: number, col: number, columns: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
-}
-
-function snapToStep(value: number, min: number, max: number, step: number): number {
-  const clamped = clamp(Math.round(value), min, max);
-  const snapped = min + Math.round((clamped - min) / step) * step;
-  return clamp(snapped, min, max);
 }

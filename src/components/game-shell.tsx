@@ -29,7 +29,7 @@ import {
   type PaletteColor,
 } from "@/lib/game";
 import {
-  computeScore,
+  formatClickCount,
   formatDuration,
   MAX_PLAYER_NAME_LENGTH,
   sanitizePlayerNameInput,
@@ -114,6 +114,7 @@ export function GameShell() {
   const [palette, setPalette] = useState<readonly PaletteColor[]>([]);
   const [status, setStatus] = useState<GameStatus>("playing");
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [clickCount, setClickCount] = useState(0);
 
   const [leaderboardRecords, setLeaderboardRecords] = useState<LeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
@@ -127,7 +128,6 @@ export function GameShell() {
   const [hasSubmittedWin, setHasSubmittedWin] = useState(false);
 
   const activePreset = DIFFICULTY_PRESETS[difficulty];
-  const winningScore = computeScore(difficulty, elapsedMs);
 
   useEffect(() => {
     const boardData = createBoardData(activePreset.size, activePreset.colorCount);
@@ -144,6 +144,7 @@ export function GameShell() {
     setPalette(boardData.palette);
     setStatus(nextStatus);
     setElapsedMs(0);
+    setClickCount(0);
     setPlayerName("");
     setSubmitError(null);
     setSubmitSuccess(null);
@@ -513,6 +514,7 @@ export function GameShell() {
     const nextStatus = getStatus(move.metrics).status;
 
     setBoard(move.board);
+    setClickCount((current) => current + 1);
 
     if (nextStatus !== "playing") {
       stopTimerAndFreeze();
@@ -557,21 +559,24 @@ export function GameShell() {
         body: JSON.stringify({
           difficulty,
           playerName: sanitizedName,
+          clickCount,
           completionTimeMs: elapsedMs,
         }),
       });
       const payload = (await response.json().catch(() => null)) as unknown;
 
       if (!response.ok) {
-        throw new Error(getApiError(payload, "Could not save your score."));
+        throw new Error(getApiError(payload, "Could not save your win."));
       }
 
       setPlayerName(sanitizedName);
       setHasSubmittedWin(true);
-      setSubmitSuccess(`Saved ${sanitizedName} to the ${getDifficultyLabel(difficulty)} leaderboard.`);
+      setSubmitSuccess(
+        `Saved ${sanitizedName} to the ${getDifficultyLabel(difficulty)} leaderboard.`,
+      );
       setLeaderboardReloadToken((current) => current + 1);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not save your score.");
+      setSubmitError(error instanceof Error ? error.message : "Could not save your win.");
     } finally {
       setSubmitPending(false);
     }
@@ -631,6 +636,7 @@ export function GameShell() {
               <div className="status-chip" data-status={status}>
                 {getStatusLabel(status)}
               </div>
+              <div className="board-stat">{formatClickCount(clickCount)}</div>
               <div className="board-timer">{formatDuration(elapsedMs)}</div>
             </div>
           </div>
@@ -654,12 +660,12 @@ export function GameShell() {
                       <h3 className="overlay-title">You Win</h3>
                       <p className="overlay-text">
                         Difficulty: {getDifficultyLabel(difficulty)}. Final time:{" "}
-                        {formatDuration(elapsedMs)}. Score: {winningScore.toLocaleString()}.
+                        {formatDuration(elapsedMs)}. Final clicks: {formatClickCount(clickCount)}.
                       </p>
 
                       <form className="winner-form" onSubmit={handleSubmitWin}>
                         <label className="field-label" htmlFor={nameInputId}>
-                          Submit your score
+                          Submit your win
                         </label>
                         <div className="winner-row">
                           <input
@@ -677,7 +683,7 @@ export function GameShell() {
                             type="submit"
                             disabled={submitPending || hasSubmittedWin}
                           >
-                            {submitPending ? "Saving..." : "Save Score"}
+                            {submitPending ? "Saving..." : "Save Win"}
                           </button>
                         </div>
                         <p className="winner-note">Names are limited to 10 characters.</p>
@@ -734,6 +740,7 @@ export function GameShell() {
           <section className="panel leaderboard-panel">
             <p className="eyebrow">Leaderboard</p>
             <h2>Top 10 {getDifficultyLabel(difficulty)} wins</h2>
+            <p className="note-text">Fewer clicks rank higher. Faster time breaks ties.</p>
 
             {leaderboardLoading ? <p className="leaderboard-empty">Loading leaderboard...</p> : null}
             {!leaderboardLoading && leaderboardError ? (
@@ -756,7 +763,7 @@ export function GameShell() {
                         {new Date(entry.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <p className="leaderboard-score">{entry.score.toLocaleString()}</p>
+                    <p className="leaderboard-score">{formatClickCount(entry.clickCount)}</p>
                   </article>
                 ))}
               </div>

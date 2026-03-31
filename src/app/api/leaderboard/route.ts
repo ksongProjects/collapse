@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { computeScore, sanitizePlayerNameInput } from "@/lib/leaderboard";
+import { sanitizePlayerNameInput } from "@/lib/leaderboard";
 import { getLeaderboardCollection, isMongoConfigured, mapLeaderboardDocument } from "@/lib/mongodb";
 import { isDifficultyId } from "@/lib/difficulty";
 
@@ -24,8 +24,11 @@ export async function GET(request: Request) {
   try {
     const collection = await getLeaderboardCollection();
     const records = await collection
-      .find({ difficulty })
-      .sort({ score: -1, completionTimeMs: 1, createdAt: 1 })
+      .find({
+        difficulty,
+        clickCount: { $gte: 1 },
+      })
+      .sort({ clickCount: 1, completionTimeMs: 1, createdAt: 1 })
       .limit(10)
       .toArray();
 
@@ -59,6 +62,7 @@ export async function POST(request: Request) {
     typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>) : {};
   const difficulty = body.difficulty;
   const rawPlayerName = body.playerName ?? "";
+  const rawClickCount = body.clickCount ?? 0;
   const rawCompletionTimeMs = body.completionTimeMs ?? 0;
 
   if (typeof difficulty !== "string" || !isDifficultyId(difficulty)) {
@@ -72,9 +76,14 @@ export async function POST(request: Request) {
   }
 
   const completionTimeMs = Number(rawCompletionTimeMs);
+  const clickCount = Number(rawClickCount);
 
   if (!Number.isInteger(completionTimeMs) || completionTimeMs <= 0) {
     return NextResponse.json({ error: "A valid completion time is required." }, { status: 400 });
+  }
+
+  if (!Number.isInteger(clickCount) || clickCount <= 0) {
+    return NextResponse.json({ error: "A valid click count is required." }, { status: 400 });
   }
 
   try {
@@ -82,7 +91,7 @@ export async function POST(request: Request) {
     const document = {
       playerName,
       difficulty,
-      score: computeScore(difficulty, completionTimeMs),
+      clickCount,
       completionTimeMs,
       createdAt: new Date(),
     };
