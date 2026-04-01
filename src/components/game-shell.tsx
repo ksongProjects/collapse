@@ -40,6 +40,7 @@ const DEFAULT_DIFFICULTY: DifficultyId = "very-easy";
 const DEFAULT_PRESET = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY];
 const REMOVAL_ANIMATION_MS = 100;
 const MOVEMENT_ANIMATION_MS = 200;
+const LEADERBOARD_PAGE_SIZE = 5;
 
 interface BoardAnimation {
   baseBoard: Board;
@@ -120,6 +121,7 @@ export function GameShell() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [leaderboardReloadToken, setLeaderboardReloadToken] = useState(0);
+  const [leaderboardPage, setLeaderboardPage] = useState(0);
 
   const [playerName, setPlayerName] = useState("");
   const [submitPending, setSubmitPending] = useState(false);
@@ -233,6 +235,10 @@ export function GameShell() {
   }, [difficulty, leaderboardReloadToken]);
 
   useEffect(() => {
+    setLeaderboardPage(0);
+  }, [difficulty]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     const boardScroll = boardScrollRef.current;
 
@@ -264,7 +270,7 @@ export function GameShell() {
       );
       const availableHeight = Math.max(
         activePreset.size.rows,
-        Math.floor(window.innerHeight * 0.76 - verticalPadding),
+        Math.floor(boardScrollElement.clientHeight - verticalPadding),
       );
       const cellSize = Math.max(
         1,
@@ -605,6 +611,13 @@ export function GameShell() {
     }
   }
 
+  const visibleLeaderboardRecords = leaderboardRecords.slice(
+    leaderboardPage * LEADERBOARD_PAGE_SIZE,
+    (leaderboardPage + 1) * LEADERBOARD_PAGE_SIZE,
+  );
+  const hasLeaderboardSecondPage = leaderboardRecords.length > LEADERBOARD_PAGE_SIZE;
+  const leaderboardStartRank = leaderboardPage * LEADERBOARD_PAGE_SIZE;
+
   return (
     <div className="shell">
       <section className="panel hero-panel">
@@ -614,11 +627,6 @@ export function GameShell() {
           <p className="intro">
             Clear every connected color group, beat the timer, and submit winning runs to the leaderboard.
           </p>
-        </div>
-        <div className="hero-actions">
-          <button className="button button-primary" type="button" onClick={handleNewBoard}>
-            New Game
-          </button>
         </div>
       </section>
 
@@ -633,6 +641,9 @@ export function GameShell() {
               </h2>
             </div>
             <div className="status-cluster">
+              <button className="button button-primary" type="button" onClick={handleNewBoard}>
+                New Game
+              </button>
               <div className="status-chip" data-status={status}>
                 {getStatusLabel(status)}
               </div>
@@ -643,12 +654,14 @@ export function GameShell() {
 
           <div className="board-stage">
             <div ref={boardScrollRef} className="board-scroll">
-              <canvas
-                ref={canvasRef}
-                className="board-canvas"
-                aria-label="Puzzle board"
-                onClick={handleBoardClick}
-              />
+              <div className="board-scroll-inner">
+                <canvas
+                  ref={canvasRef}
+                  className="board-canvas"
+                  aria-label="Puzzle board"
+                  onClick={handleBoardClick}
+                />
+              </div>
             </div>
 
             {status !== "playing" ? (
@@ -739,35 +752,49 @@ export function GameShell() {
 
           <section className="panel leaderboard-panel">
             <p className="eyebrow">Leaderboard</p>
-            <h2>Top 10 {getDifficultyLabel(difficulty)} wins</h2>
+            <h2>{getDifficultyLabel(difficulty)} wins</h2>
             <p className="note-text">Faster time ranks higher. Fewer clicks break ties.</p>
 
-            {leaderboardLoading ? <p className="leaderboard-empty">Loading leaderboard...</p> : null}
-            {!leaderboardLoading && leaderboardError ? (
-              <p className="leaderboard-empty">{leaderboardError}</p>
-            ) : null}
-            {!leaderboardLoading && !leaderboardError && leaderboardRecords.length === 0 ? (
-              <p className="leaderboard-empty">No wins saved for this difficulty yet.</p>
-            ) : null}
+            <div className="leaderboard-body">
+              {leaderboardLoading ? <p className="leaderboard-empty">Loading leaderboard...</p> : null}
+              {!leaderboardLoading && leaderboardError ? (
+                <p className="leaderboard-empty">{leaderboardError}</p>
+              ) : null}
+              {!leaderboardLoading && !leaderboardError && leaderboardRecords.length === 0 ? (
+                <p className="leaderboard-empty">No wins saved for this difficulty yet.</p>
+              ) : null}
 
-            {!leaderboardLoading && !leaderboardError && leaderboardRecords.length > 0 ? (
-              <div className="leaderboard-list">
-                {leaderboardRecords.map((entry, index) => (
-                  <article className="leaderboard-item" key={entry.id}>
-                    <div className="leaderboard-copy">
-                      <p className="leaderboard-rank">
-                        #{index + 1} {entry.playerName}
-                      </p>
-                      <p className="leaderboard-meta">
-                        {formatDuration(entry.completionTimeMs)} |{" "}
-                        {new Date(entry.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <p className="leaderboard-score">{formatClickCount(entry.clickCount)}</p>
-                  </article>
-                ))}
-              </div>
-            ) : null}
+              {!leaderboardLoading && !leaderboardError && leaderboardRecords.length > 0 ? (
+                <>
+                  <div className="leaderboard-list">
+                    {visibleLeaderboardRecords.map((entry, index) => (
+                      <article className="leaderboard-item" key={entry.id}>
+                        <div className="leaderboard-copy">
+                          <p className="leaderboard-rank">
+                            #{leaderboardStartRank + index + 1} {entry.playerName}
+                          </p>
+                          <p className="leaderboard-meta">
+                            {formatDuration(entry.completionTimeMs)} |{" "}
+                            {new Date(entry.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <p className="leaderboard-score">{formatClickCount(entry.clickCount)}</p>
+                      </article>
+                    ))}
+                  </div>
+
+                  {hasLeaderboardSecondPage ? (
+                    <button
+                      className="button leaderboard-page-button"
+                      type="button"
+                      onClick={() => setLeaderboardPage((current) => (current === 0 ? 1 : 0))}
+                    >
+                      {leaderboardPage === 0 ? "Show next 5" : "Show first 5"}
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           </section>
         </aside>
       </div>
