@@ -534,6 +534,7 @@ h3 {
   min-height: 0;
   overflow: auto;
   padding-right: 6px;
+  align-content: start;
 }
 
 .leaderboard-item {
