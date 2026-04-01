@@ -100,10 +100,12 @@ function toCellKey(row: number, col: number, columns: number): number {
 }
 
 export function GameShell() {
+  const shellRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   const timerHandleRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
   const animationRef = useRef<BoardAnimation | null>(null);
   const drawBoardRef = useRef<(() => void) | null>(null);
   const runStartedAtRef = useRef(0);
@@ -181,6 +183,11 @@ export function GameShell() {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
+
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
     };
   }, []);
 
@@ -254,8 +261,11 @@ export function GameShell() {
     }
 
     const canvasElement = canvas;
+    const shellElement = shellRef.current;
     const boardScrollElement = boardScroll;
+    const boardPanelElement = boardScrollElement.closest(".board-panel");
     const drawingContext = context;
+    const viewport = window.visualViewport;
 
     function drawBoard() {
       const boardScrollStyles = window.getComputedStyle(boardScrollElement);
@@ -410,16 +420,43 @@ export function GameShell() {
 
     }
 
-    drawBoardRef.current = drawBoard;
-    drawBoard();
+    function scheduleBoardDraw() {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+      }
 
-    const resizeObserver = new ResizeObserver(drawBoard);
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        drawBoard();
+      });
+    }
+
+    drawBoardRef.current = drawBoard;
+    scheduleBoardDraw();
+
+    const resizeObserver = new ResizeObserver(scheduleBoardDraw);
     resizeObserver.observe(boardScrollElement);
-    window.addEventListener("resize", drawBoard);
+
+    if (shellElement instanceof HTMLElement) {
+      resizeObserver.observe(shellElement);
+    }
+
+    if (boardPanelElement instanceof HTMLElement) {
+      resizeObserver.observe(boardPanelElement);
+    }
+
+    window.addEventListener("resize", scheduleBoardDraw);
+    viewport?.addEventListener("resize", scheduleBoardDraw);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener("resize", drawBoard);
+      window.removeEventListener("resize", scheduleBoardDraw);
+      viewport?.removeEventListener("resize", scheduleBoardDraw);
+
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
     };
   }, [activePreset.size.columns, activePreset.size.rows, board, palette]);
 
@@ -622,7 +659,7 @@ export function GameShell() {
   const leaderboardStartRank = leaderboardPage * LEADERBOARD_PAGE_SIZE;
 
   return (
-    <div className="shell">
+    <div ref={shellRef} className="page-stack">
       <section className="panel hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">Puzzle Game</p>
@@ -636,7 +673,7 @@ export function GameShell() {
       <div className="game-layout">
         <section className="panel board-panel">
           <div className="section-top">
-            <div>
+            <div className="section-top-copy">
               <p className="eyebrow">Board</p>
               <h2>
                 {getDifficultyLabel(difficulty)} | {activePreset.size.columns} x{" "}

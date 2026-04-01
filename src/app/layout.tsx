@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -30,10 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="app-body">
-        <main className="app-main">{children}</main>
-        <footer className="site-footer">
+        <main className="app-main site-shell">{children}</main>
+        <footer className="site-footer site-shell">
           <div className="panel site-footer-panel">
-            <p className="site-footer-copy">Copyright (c) {new Date().getFullYear()} ksongProjects</p>
+            <p className="site-footer-copy">
+              Copyright (c) {new Date().getFullYear()} ksongProjects
+            </p>
             <a
               className="site-footer-link"
               href={REPOSITORY_URL}
