@@ -1,6 +1,6 @@
 import { normalizeBoardSize, type BoardSize } from "@/lib/game";
 
-export type DifficultyId = "very-easy" | "easy" | "medium" | "hard";
+export type DifficultyId = "easy" | "medium" | "hard";
 
 export interface DifficultyPreset {
   label: string;
@@ -9,33 +9,27 @@ export interface DifficultyPreset {
 }
 
 export const DIFFICULTY_ORDER: readonly DifficultyId[] = [
-  "very-easy",
   "easy",
   "medium",
   "hard",
 ];
 
 export const DIFFICULTY_PRESETS: Record<DifficultyId, DifficultyPreset> = {
-  "very-easy": {
-    label: "Very Easy",
+  easy: {
+    label: "Easy",
     size: normalizeBoardSize({ columns: 12, rows: 12 }),
     colorCount: 4,
   },
-  easy: {
-    label: "Easy",
+  medium: {
+    label: "Medium",
     size: normalizeBoardSize({ columns: 20, rows: 20 }),
     colorCount: 5,
   },
-  medium: {
-    label: "Medium",
-    size: normalizeBoardSize({ columns: 25, rows: 30 }),
-    colorCount: 6,
-  },
   hard: {
     label: "Hard",
-    size: normalizeBoardSize({ columns: 35, rows: 40 }),
-    colorCount: 7,
-  },
+    size: normalizeBoardSize({ columns: 25, rows: 30 }),
+    colorCount: 6,
+  }
 };
 
 export function isDifficultyId(value: string): value is DifficultyId {

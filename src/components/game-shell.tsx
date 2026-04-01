@@ -36,7 +36,7 @@ import {
   type LeaderboardEntry,
 } from "@/lib/leaderboard";
 
-const DEFAULT_DIFFICULTY: DifficultyId = "very-easy";
+const DEFAULT_DIFFICULTY: DifficultyId = "easy";
 const DEFAULT_PRESET = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY];
 const REMOVAL_ANIMATION_MS = 100;
 const MOVEMENT_ANIMATION_MS = 200;
