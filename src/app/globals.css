@@ -29,7 +29,7 @@ body {
 }
 
 body {
-  min-height: 100svh;
+  min-height: 100vh;
   color: var(--page-ink);
   background:
     radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 26%),
@@ -43,7 +43,7 @@ body {
 }
 
 .app-body {
-  min-height: 100svh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }

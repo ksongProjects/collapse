@@ -41,7 +41,7 @@ const DEFAULT_PRESET = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY];
 const REMOVAL_ANIMATION_MS = 100;
 const MOVEMENT_ANIMATION_MS = 200;
 const LEADERBOARD_PAGE_SIZE = 5;
-const BOARD_VIEWPORT_PADDING = 16;
+const BOARD_MAX_VIEWPORT_RATIO = 0.75;
 
 interface BoardAnimation {
   baseBoard: Board;
@@ -265,7 +265,6 @@ export function GameShell() {
     const boardScrollElement = boardScroll;
     const boardPanelElement = boardScrollElement.closest(".board-panel");
     const drawingContext = context;
-    const viewport = window.visualViewport;
 
     function drawBoard() {
       const boardScrollStyles = window.getComputedStyle(boardScrollElement);
@@ -275,15 +274,18 @@ export function GameShell() {
       const verticalPadding =
         Number.parseFloat(boardScrollStyles.paddingTop) +
         Number.parseFloat(boardScrollStyles.paddingBottom);
-      const viewportHeight = Math.floor(window.visualViewport?.height ?? window.innerHeight);
-      const boardTop = Math.floor(boardScrollElement.getBoundingClientRect().top);
+      const viewportHeight = Math.floor(document.documentElement.clientHeight || window.innerHeight);
+      const boardMaxHeight = Math.max(
+        activePreset.size.rows,
+        Math.floor(viewportHeight * BOARD_MAX_VIEWPORT_RATIO),
+      );
       const availableWidth = Math.max(
         activePreset.size.columns,
         Math.floor(boardScrollElement.clientWidth - horizontalPadding),
       );
       const availableHeight = Math.max(
         activePreset.size.rows,
-        Math.floor(viewportHeight - boardTop - BOARD_VIEWPORT_PADDING - verticalPadding),
+        Math.floor(boardMaxHeight - verticalPadding),
       );
       const cellSize = Math.max(
         1,
@@ -446,12 +448,10 @@ export function GameShell() {
     }
 
     window.addEventListener("resize", scheduleBoardDraw);
-    viewport?.addEventListener("resize", scheduleBoardDraw);
 
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", scheduleBoardDraw);
-      viewport?.removeEventListener("resize", scheduleBoardDraw);
 
       if (resizeFrameRef.current !== null) {
         window.cancelAnimationFrame(resizeFrameRef.current);
@@ -663,7 +663,7 @@ export function GameShell() {
       <section className="panel hero-panel">
         <div className="hero-copy">
           <p className="eyebrow">Puzzle Game</p>
-          <h1>Collapse Game</h1>
+          <h2>Collapse Game</h2>
           <p className="intro">
             Clear every connected color group, beat the timer, and submit winning runs to the leaderboard.
           </p>

@@ -34,7 +34,7 @@ export default function RootLayout({
         <footer className="site-footer site-shell">
           <div className="panel site-footer-panel">
             <p className="site-footer-copy">
-              Copyright (c) {new Date().getFullYear()} ksongProjects
+              Copyright &copy; {new Date().getFullYear()} ksongProjects
             </p>
             <a
               className="site-footer-link"
