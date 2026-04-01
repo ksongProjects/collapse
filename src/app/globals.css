@@ -227,7 +227,6 @@ h3 {
 }
 
 .board-panel {
-  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -281,9 +280,6 @@ h3 {
 
 .board-stage {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  display: flex;
 }
 
 .board-stat,
@@ -309,8 +305,6 @@ h3 {
 }
 
 .board-scroll {
-  flex: 1;
-  min-height: 0;
   overflow: auto;
   padding: 14px;
   border: 1px solid rgba(148, 163, 184, 0.14);
@@ -329,9 +323,8 @@ h3 {
 
 .board-scroll-inner {
   min-width: 100%;
-  min-height: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 

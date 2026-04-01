@@ -41,6 +41,7 @@ const DEFAULT_PRESET = DIFFICULTY_PRESETS[DEFAULT_DIFFICULTY];
 const REMOVAL_ANIMATION_MS = 100;
 const MOVEMENT_ANIMATION_MS = 200;
 const LEADERBOARD_PAGE_SIZE = 5;
+const BOARD_VIEWPORT_PADDING = 16;
 
 interface BoardAnimation {
   baseBoard: Board;
@@ -264,13 +265,15 @@ export function GameShell() {
       const verticalPadding =
         Number.parseFloat(boardScrollStyles.paddingTop) +
         Number.parseFloat(boardScrollStyles.paddingBottom);
+      const viewportHeight = Math.floor(window.visualViewport?.height ?? window.innerHeight);
+      const boardTop = Math.floor(boardScrollElement.getBoundingClientRect().top);
       const availableWidth = Math.max(
         activePreset.size.columns,
         Math.floor(boardScrollElement.clientWidth - horizontalPadding),
       );
       const availableHeight = Math.max(
         activePreset.size.rows,
-        Math.floor(boardScrollElement.clientHeight - verticalPadding),
+        Math.floor(viewportHeight - boardTop - BOARD_VIEWPORT_PADDING - verticalPadding),
       );
       const cellSize = Math.max(
         1,
