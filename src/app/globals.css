@@ -311,7 +311,7 @@ h3 {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.96)),
     var(--page-panel);
-  overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -331,7 +331,7 @@ h3 {
 .board-canvas {
   display: block;
   margin: 0 auto;
-  touch-action: manipulation;
+  touch-action: auto;
   cursor: pointer;
   background: #020617;
   image-rendering: pixelated;
