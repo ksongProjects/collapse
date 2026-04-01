@@ -218,9 +218,7 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1.85fr) minmax(320px, 0.95fr);
   gap: 24px;
-  align-items: stretch;
-  height: 75svh;
-  max-height: 75svh;
+  align-items: start;
 }
 
 .board-panel,
@@ -230,7 +228,6 @@ h3 {
 
 .board-panel {
   height: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
 }
